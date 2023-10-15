@@ -1,6 +1,7 @@
 # Bäderland Swimming Course Checker
 
-The BLSCC notifies you through [IFTTT](https://ifttt.com/) when a swimming course is available at Hamburg's [Bäderland Hamburg](https://www.baederland.de/).
+The BLSCC notifies you through [IFTTT](https://ifttt.com/) when a swimming course is available at Hamburg's
+[Bäderland](https://www.baederland.de/) swimming pools.
 
 ## Usage
 
@@ -12,4 +13,4 @@ $ ./notify_course_availability.sh --ifttt_key=<key> ...
 
 ## Technical Details
 
-The tool parses HTML :-(.
+The tool uses [Scrapy](https://scrapy.org/) to parse HTML.
