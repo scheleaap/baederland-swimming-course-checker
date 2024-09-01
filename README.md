@@ -8,7 +8,7 @@ The BLSCC notifies you through [IFTTT](https://ifttt.com/) when a swimming cours
 First, set up an IFTTT [webhook](https://ifttt.com/maker_webhooks) named `hhpl` and copy the key.
 
 ```sh
-$ ./notify_course_availability.sh --ifttt_key=<key> ...
+$ ./notify_course_availability.sh ...
 ```
 
 ## Technical Details
