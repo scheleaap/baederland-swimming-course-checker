@@ -12,7 +12,8 @@ DEFAULT_BASE_URL = "https://www.baederland.de/kurse/kursfinder/"
 TIME_PATTERN = re.compile(r"^(\d\d:\d\d)-(\d\d:\d\d) Uhr$")
 
 # '0\t\t\t\t\t\t\t\t\t\t\t\t\t\tfreie Plätze'
-AVAILABLE_SLOTS_PATTERN = re.compile(r"^(\d+)\t+freie Plätze$")
+# 'mehr als 5\r\n\t\t\t\t\t\t\t\t\t\t\t\t\t\tfreie Plätze'
+AVAILABLE_SLOTS_PATTERN = re.compile(r"^(?:mehr als )?(-?\d+)\s+freie Plätze$")
 
 
 class CourseSpider(scrapy.Spider):
@@ -20,13 +21,12 @@ class CourseSpider(scrapy.Spider):
 
     @classmethod
     def from_crawler(cls, crawler: Crawler, *args, **kwargs):
-        return cls(category=crawler.settings.getint("COURSE_CATEGORY"))
+        return cls(search_url=crawler.settings.get("SEARCH_URL"))
 
-    def __init__(self, category: int, *args, **kwargs):
+    def __init__(self, search_url: str, *args, **kwargs):
         super(CourseSpider, self).__init__(*args, **kwargs)
-        self.start_urls = [
-            f"https://www.baederland.de/kurse/kursfinder/?course[category][]={category}&course[weekday][]=1&course[weekday][]=2&course[weekday][]=4&course[weekday][]=5&course[weekday][]=6&course[weekday][]=7"
-        ]
+        self.search_url = search_url
+        self.start_urls = [search_url]
 
     def parse(self, response, **kwargs):
         for weekday in response.css('a.button-list--button'):
@@ -63,7 +63,8 @@ class CourseSpider(scrapy.Spider):
             time_start=time_start,
             time_end=time_end,
             location=raw_location,
-            available_slots=self.raw_to_available_slots(raw_available_slots)
+            available_slots=self.raw_to_available_slots(raw_available_slots),
+            search_url=self.search_url
         )
         yield course
 
@@ -83,4 +84,6 @@ class CourseSpider(scrapy.Spider):
 
     def raw_to_available_slots(self, raw: str) -> int:
         m = AVAILABLE_SLOTS_PATTERN.match(raw)
+        if not m:
+            raise Exception(f"Cannot match '{raw}' against '{AVAILABLE_SLOTS_PATTERN.pattern}'")
         return int(m.group(1))

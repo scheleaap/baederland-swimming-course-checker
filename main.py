@@ -15,10 +15,13 @@ def parse_arguments(raw_args):
         description="Notifies that a swimming course is available.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--category", type=int, required=True, help="The category number of the course")
-    parser.add_argument("-w", "--weekday", type=int,action="append", required=True, help="The weekday of the course (Sunday = 0)")
-    parser.add_argument("--ifttt_key", help="The IFTTT key")
-    parser.add_argument("-c", "--console", action='store_true', help="Notify on the console in addition to IFTTT")
+    parser.add_argument("--search-url", type=str, help="The URL of the initial search",
+                        default="https://www.baederland.de/kurse/kursfinder/?course%5Blocation%5D=&course%5Blatlng%5D=&course%5Bpool%5D%5B%5D=43&course%5Bpool%5D%5B%5D=12&course%5Bpool%5D%5B%5D=23&course%5Bpool%5D%5B%5D=35&course%5Bpool%5D%5B%5D=10&course%5Bpool%5D%5B%5D=17&course%5Bpool%5D%5B%5D=28&course%5Bpool%5D%5B%5D=26&course%5Bpool%5D%5B%5D=36&course%5Bpool%5D%5B%5D=33&course%5Bpool%5D%5B%5D=5&course%5Bpool%5D%5B%5D=18&course%5Bpool%5D%5B%5D=14&course%5Bpool%5D%5B%5D=13&course%5Bpool%5D%5B%5D=9&course%5Bpool%5D%5B%5D=5&course%5Bpool%5D%5B%5D=14&course%5Bpool%5D%5B%5D=26&course%5Bcategory%5D%5B%5D=55&course%5Bdate%5D=04.12.2024&course%5Bweekday%5D%5B%5D=1&course%5Bweekday%5D%5B%5D=2&course%5Bweekday%5D%5B%5D=4&course%5Bweekday%5D%5B%5D=5&course%5Bweekday%5D%5B%5D=6")
+    parser.add_argument("--log-all", action='store_true', help="Log all (i.e. also non matching courses)")
+    parser.add_argument("--console", action=argparse.BooleanOptionalAction, default=False, help="Notify on the console (default: false)")
+    parser.add_argument("--ifttt", action=argparse.BooleanOptionalAction, default=True, help="Notify to IFTTT (default: true)")
+    parser.add_argument("--ifttt-key", help="The IFTTT key")
+    parser.add_argument("-q", "--quiet", action='store_true', help="Suppress all regular output (default: false)")
 
     args = parser.parse_args(raw_args)
 
@@ -26,47 +29,49 @@ def parse_arguments(raw_args):
 
 
 def main(args):
-    notifiers = [
-        IftttNotifier(key=args.ifttt_key),
-    ]
+    log_level = logging.WARNING if args.quiet else logging.INFO
+
+    logger = logging.getLogger("blscc.main")
+    logger.setLevel(log_level)
+
+    notifiers = []
     if args.console:
         notifiers.append(StdoutNotifier())
+    if args.ifttt:
+        notifiers.append(IftttNotifier(key=args.ifttt_key))
 
-    logging.info(f"Searching for courses in category {args.category} on weekdays {args.weekday}")
+    logger.info(f"Searching for courses, starting from URL {args.search_url}")
 
     process = CrawlerProcess(
         settings={
             "BOT_NAME": "Baederland Swimming Courses",
+            "LOG_LEVEL": log_level,
             "ITEM_PIPELINES": {
                 "pipelines.InMemoryCollectorPipeline": 1,
             },
             "REQUEST_FINGERPRINTER_IMPLEMENTATION": "2.7",
             "TWISTED_REACTOR": "twisted.internet.asyncioreactor.AsyncioSelectorReactor",
             "FEED_EXPORT_ENCODING": "utf-8",
-            "COURSE_CATEGORY": args.category
+            "SEARCH_URL": args.search_url
         }
     )
     logging.getLogger("scrapy").setLevel(logging.WARNING)
+    logging.getLogger("asyncio").setLevel(logging.WARNING)
     process.crawl(CourseSpider)
     process.start()
 
     courses = pipelines.COLLECTED_COURSES
-    logging.debug(f"Found {len(courses)} courses (unfiltered)")
-    # for c in courses:
-    #     print(c)
-    matched_courses = [c for c in courses if c.weekday in args.weekday and c.available_slots > 0]
-    logging.debug(f"Matched {len(matched_courses)} courses")
+    logger.debug(f"Found {len(courses)} courses (unfiltered)")
+    if args.log_all:
+        for c in courses:
+            logger.debug(f"Found course: {c}")
+    matched_courses = [c for c in courses if c.available_slots > 0]
+    logger.debug(f"Matched {len(matched_courses)} courses")
 
-    for course in matched_courses:
+    if matched_courses:
         for notifier in notifiers:
-            notifier.course_is_available(course)
-
-
-def setup_logging(level):
-    logging.basicConfig(level=level, format="%(message)s")
-    logging.getLogger("asyncio").setLevel(logging.WARNING)
+            notifier.courses_available(matched_courses)
 
 
 if __name__ == "__main__":
-    setup_logging(logging.INFO)
     main(parse_arguments(sys.argv[1:]))

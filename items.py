@@ -13,3 +13,4 @@ class Course:
     time_end: time
     location: str
     available_slots: int
+    search_url: str
