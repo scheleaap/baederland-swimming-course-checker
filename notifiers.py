@@ -20,26 +20,28 @@ class StdoutNotifier(Notifier):
         )
 
 
-class IftttNotifier(Notifier):
-    def __init__(self, key: str) -> None:
-        self.key = key
+class PushoverNotifier(Notifier):
+    def __init__(self, app_token: str, user_key: str) -> None:
+        self.app_token = app_token
+        self.user_key = user_key
 
     def courses_available(self, courses: list[Course]):
         logger = logging.getLogger("blscc.notifiers")
 
         course_names = {c.name for c in courses}
-        value2 = (
+        message = (
             f"Swimming course '{next(iter(course_names))}' is available. Go get it now!"
             if len(course_names) == 1
             else f"{len(courses)} swimming courses are available. Go get one now!"
-        )
+        ) + f"\n\n{courses[0].search_url}"
         payload = {
-            "value1": "Swimming courses available",
-            "value2": value2,
-            "value3": courses[0].search_url,
+            "token": self.app_token,
+            "user": self.user_key,
+            "title": "Swimming courses available",
+            "message": message,
         }
-        logger.debug(f"Calling IFTTT with payload {payload}")
+        logger.debug(f"Calling Pushover with payload {payload}")
         response = requests.post(
-            f"https://maker.ifttt.com/trigger/hhpl/with/key/{self.key}", json=payload
+            f"https://api.pushover.net/1/messages.json", data=payload
         )
         response.raise_for_status()
