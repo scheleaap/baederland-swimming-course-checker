@@ -53,7 +53,6 @@ def main(args):
             "ITEM_PIPELINES": {
                 "pipelines.InMemoryCollectorPipeline": 1,
             },
-            "REQUEST_FINGERPRINTER_IMPLEMENTATION": "2.7",
             "TWISTED_REACTOR": "twisted.internet.asyncioreactor.AsyncioSelectorReactor",
             "FEED_EXPORT_ENCODING": "utf-8",
             "SEARCH_URL": args.search_url
